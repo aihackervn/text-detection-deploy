@@ -69,15 +69,32 @@ const App = () => {
     renderBoxes(canvasRef, selectedBoxes, labels); // Draw boxes
   };
 
+  // useEffect(() => {
+  //   cv["onRuntimeInitialized"] = () => {
+  //     ort.InferenceSession.create(`${process.env.PUBLIC_URL}/model/${modelName}.onnx`).then(
+  //       (yolov5) => {
+  //         setSession(yolov5);
+  //         setLoading(false);
+  //       }
+  //     );
+  //   };
+  // }, []);
   useEffect(() => {
-    cv["onRuntimeInitialized"] = () => {
-      ort.InferenceSession.create(`${process.env.PUBLIC_URL}/model/${modelName}.onnx`).then(
-        (yolov5) => {
-          setSession(yolov5);
-          setLoading(false);
-        }
-      );
-    };
+    tf.loadGraphModel(`model/model.json`, {
+      onProgress: (fractions) => {
+        setLoading({ loading: true, progress: fractions });
+      },
+    }).then(async (yolov5) => {
+      // Warmup the model before using real data.
+      const dummyInput = tf.ones(yolov5.inputs[0].shape);
+      await yolov5.executeAsync(dummyInput).then((warmupResult) => {
+        tf.dispose(warmupResult);
+        tf.dispose(dummyInput);
+
+        setLoading({ loading: false, progress: 1 });
+        webcam.open(videoRef, () => detectFrame(yolov5));
+      });
+    });
   }, []);
 
   return (
